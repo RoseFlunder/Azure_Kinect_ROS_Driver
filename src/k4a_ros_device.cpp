@@ -576,11 +576,11 @@ k4a_result_t K4AROSDevice::getRgbPointCloud(const k4a::capture &capture, sensor_
         return K4A_RESULT_FAILED;
     }
 
-    point_cloud->header.frame_id = calibration_data_.tf_prefix_ + calibration_data_.rgb_camera_frame_;
+    point_cloud->header.frame_id = calibration_data_.tf_prefix_ + calibration_data_.depth_camera_frame_;
     point_cloud->header.stamp = timestampToROS(k4a_depth_frame.get_device_timestamp());
     printTimestampDebugMessage("RGB point cloud", point_cloud->header.stamp);
-    point_cloud->height = k4a_bgra_frame.get_height_pixels();
-    point_cloud->width = k4a_bgra_frame.get_width_pixels();
+    point_cloud->height = k4a_depth_frame.get_height_pixels();
+    point_cloud->width = k4a_depth_frame.get_width_pixels();
     point_cloud->is_dense = false;
     point_cloud->is_bigendian = false;
 
@@ -595,11 +595,11 @@ k4a_result_t K4AROSDevice::getRgbPointCloud(const k4a::capture &capture, sensor_
     sensor_msgs::PointCloud2Iterator<uint8_t> iter_g(*point_cloud, "g");
     sensor_msgs::PointCloud2Iterator<uint8_t> iter_b(*point_cloud, "b");
 
-    const size_t point_count = k4a_bgra_frame.get_size() / sizeof(BgraPixel);
+    const size_t point_count = k4a_depth_frame.get_size() / sizeof(DepthPixel);
+
     if (point_count != (point_cloud->height * point_cloud->width))
     {
         ROS_WARN("point_count does not match point cloud resolution!");
-        return K4A_RESULT_FAILED;
     }
 
     const size_t pixel_count = k4a_bgra_frame.get_size() / sizeof(BgraPixel);
@@ -609,19 +609,17 @@ k4a_result_t K4AROSDevice::getRgbPointCloud(const k4a::capture &capture, sensor_
         return K4A_RESULT_FAILED;
     }
 
-    // transform depth image into color camera geometry
-    calibration_data_.k4a_transformation_.depth_image_to_color_camera(
-        k4a_depth_frame,
-        &calibration_data_.transformed_depth_image_);
+    // transform color image into depth camera geometry
+    calibration_data_.k4a_transformation_.color_image_to_depth_camera(k4a_depth_frame, k4a_bgra_frame, &calibration_data_.transformed_rgb_image_);
 
     // Tranform depth image to point cloud (note that this is now from the perspective of the color camera)
     calibration_data_.k4a_transformation_.depth_image_to_point_cloud(
-        calibration_data_.transformed_depth_image_,
-        K4A_CALIBRATION_TYPE_COLOR,
+        k4a_depth_frame,
+        K4A_CALIBRATION_TYPE_DEPTH,
         &calibration_data_.point_cloud_image_);
 
     int16_t *point_cloud_buffer = reinterpret_cast<int16_t *>(calibration_data_.point_cloud_image_.get_buffer());
-    uint8_t *rgb_image_buffer = k4a_bgra_frame.get_buffer();
+    uint8_t *rgb_image_buffer = calibration_data_.transformed_rgb_image_.get_buffer();
 
     for (size_t i = 0; i < point_count; i++, ++iter_x, ++iter_y, ++iter_z, ++iter_r, ++iter_g, ++iter_b)
     {
