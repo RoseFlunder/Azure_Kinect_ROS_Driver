@@ -55,6 +55,7 @@ class K4AROSDevice
 
     k4a_result_t getDepthFrame(const k4a::capture &capture, sensor_msgs::ImagePtr depth_frame, bool rectified);
 
+    void proccessPointCloud(const k4a::capture &capture, sensor_msgs::PointCloud2Ptr point_cloud);
     k4a_result_t getPointCloud(const k4a::capture &capture, sensor_msgs::PointCloud2Ptr point_cloud);
 
     k4a_result_t getRgbPointCloud(const k4a::capture &capture, sensor_msgs::PointCloud2Ptr point_cloud);
