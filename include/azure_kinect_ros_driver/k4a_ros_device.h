@@ -57,6 +57,10 @@ class K4AROSDevice
 
     k4a_result_t getRgbPointCloud(const k4a::capture &capture, sensor_msgs::PointCloud2Ptr point_cloud);
 
+    k4a::image downscale_image_2x2_binning(const k4a::image color_image);
+
+    k4a::image downscale_image_4x4_binning(const k4a::image color_image);
+
     k4a_result_t getImuFrame(const k4a_imu_sample_t &capture, sensor_msgs::ImuPtr imu_frame);
 
     k4a_result_t getRbgFrame(const k4a::capture &capture, sensor_msgs::ImagePtr rgb_frame, bool rectified);

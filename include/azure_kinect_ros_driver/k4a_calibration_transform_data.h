@@ -40,10 +40,12 @@ public:
 
     k4a::calibration k4a_calibration_;
     k4a::transformation k4a_transformation_;
+    k4a::transformation k4a_transformation_downscaled_;
 
     k4a::image point_cloud_image_;
     k4a::image transformed_rgb_image_;
     k4a::image transformed_depth_image_;
+    k4a::image transformed_depth_image_downscaled_;
 
     std::string tf_prefix_ = "";
     std::string camera_base_frame_ = "camera_base";
