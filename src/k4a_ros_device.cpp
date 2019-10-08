@@ -831,6 +831,7 @@ static void create_xy_table(const k4a_calibration_t *calibration, k4a_float2_t* 
 }
 
 static void generate_point_cloud(const k4a::image &depth_image,
+                                 const k4a::image &color_image,
                                  k4a_float2_t *xy_table_data,
                                  K4ACalibrationTransformData &calibration_data,
                                  ros::Publisher pub)
@@ -857,7 +858,7 @@ static void generate_point_cloud(const k4a::image &depth_image,
     sensor_msgs::PointCloud2Iterator<uint8_t> iter_g(*point_cloud, "g");
     sensor_msgs::PointCloud2Iterator<uint8_t> iter_b(*point_cloud, "b");
 
-    calibration_data.k4a_transformation_.color_image_to_depth_camera(depth_image, calibration_data.transformed_rgb_image_);
+    calibration_data.k4a_transformation_.color_image_to_depth_camera(depth_image, color_image, &calibration_data.transformed_rgb_image_);
 
     int width = depth_image.get_width_pixels();
     int height = depth_image.get_height_pixels();
@@ -1210,7 +1211,7 @@ void K4AROSDevice::framePublisherThread()
 
         if (pub_pcl_with_table.getNumSubscribers() > 0)
         {
-            generate_point_cloud(capture.get_depth_image(), xy_table, calibration_data_, pub_pcl_with_table);
+            generate_point_cloud(capture.get_depth_image(), capture.get_color_image(), xy_table, calibration_data_, pub_pcl_with_table);
         }
 
         // Only create pointcloud when we are using a device or we have a synchronized image.
