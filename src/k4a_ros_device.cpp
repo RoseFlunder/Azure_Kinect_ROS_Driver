@@ -797,6 +797,96 @@ k4a_result_t K4AROSDevice::renderBodyIndexMapToROS(sensor_msgs::ImagePtr body_in
 }
 #endif
 
+static void create_xy_table(const k4a_calibration_t *calibration, k4a_float2_t* table_data)
+{
+    int width = calibration->depth_camera_calibration.resolution_width;
+    int height = calibration->depth_camera_calibration.resolution_height;
+
+    k4a_float2_t p;
+    k4a_float3_t ray;
+    int valid;
+
+    for (int y = 0, idx = 0; y < height; y++)
+    {
+        p.xy.y = (float)y;
+        for (int x = 0; x < width; x++, idx++)
+        {
+            p.xy.x = (float)x;
+
+            k4a_calibration_2d_to_3d(
+                calibration, &p, 1.f, K4A_CALIBRATION_TYPE_DEPTH, K4A_CALIBRATION_TYPE_DEPTH, &ray, &valid);
+
+            if (valid)
+            {
+                table_data[idx].xy.x = ray.xyz.x;
+                table_data[idx].xy.y = ray.xyz.y;
+            }
+            else
+            {
+                table_data[idx].xy.x = nanf("");
+                table_data[idx].xy.y = nanf("");
+            }
+        }
+    }
+}
+
+static void generate_point_cloud(const k4a::image &depth_image,
+                                 k4a_float2_t *xy_table_data,
+                                 K4ACalibrationTransformData &calibration_data,
+                                 ros::Publisher pub)
+{    
+    PointCloud2Ptr point_cloud(new PointCloud2);
+
+    point_cloud->header.frame_id = calibration_data.tf_prefix_ + calibration_data.depth_camera_frame_;
+    point_cloud->header.stamp = ros::Time::now();
+    printTimestampDebugMessage("Point cloud", point_cloud->header.stamp);
+
+    point_cloud->height = depth_image.get_height_pixels();
+    point_cloud->width = depth_image.get_width_pixels();
+    point_cloud->is_dense = true;
+    point_cloud->is_bigendian = false;
+
+    sensor_msgs::PointCloud2Modifier pcd_modifier(*point_cloud);
+    pcd_modifier.setPointCloud2FieldsByString(2, "xyz", "rgb");
+
+    sensor_msgs::PointCloud2Iterator<float> iter_x(*point_cloud, "x");
+    sensor_msgs::PointCloud2Iterator<float> iter_y(*point_cloud, "y");
+    sensor_msgs::PointCloud2Iterator<float> iter_z(*point_cloud, "z");
+
+    sensor_msgs::PointCloud2Iterator<uint8_t> iter_r(*point_cloud, "r");
+    sensor_msgs::PointCloud2Iterator<uint8_t> iter_g(*point_cloud, "g");
+    sensor_msgs::PointCloud2Iterator<uint8_t> iter_b(*point_cloud, "b");
+
+    calibration_data.k4a_transformation_.color_image_to_depth_camera(depth_image, calibration_data.transformed_rgb_image_);
+
+    int width = depth_image.get_width_pixels();
+    int height = depth_image.get_height_pixels();
+
+    uint16_t *depth_data = (uint16_t *)(void *)depth_image.get_buffer();
+    uint8_t *rgb_image_buffer = calibration_data.transformed_rgb_image_.get_buffer();
+
+    for (int i = 0; i < width * height; i++, ++iter_x, ++iter_y, ++iter_z, ++iter_r, ++iter_g, ++iter_b)
+    {
+        if (depth_data[i] != 0 && !isnan(xy_table_data[i].xy.x) && !isnan(xy_table_data[i].xy.y))
+        {
+            *iter_x = xy_table_data[i].xy.x * (float)depth_data[i] / 1000.f;
+            *iter_y = -xy_table_data[i].xy.y * (float)depth_data[i] / 1000.f;
+            *iter_z = (float)depth_data[i] / 1000.f;
+
+            BgraPixel color_pixel = {rgb_image_buffer[4 * i + 0],
+                                 rgb_image_buffer[4 * i + 1],
+                                 rgb_image_buffer[4 * i + 2],
+                                 rgb_image_buffer[4 * i + 3]};
+
+            *iter_r = color_pixel.Red;
+            *iter_g = color_pixel.Green;
+            *iter_b = color_pixel.Blue;
+        }
+    }
+
+    pub.publish(point_cloud);
+}
+
 void K4AROSDevice::framePublisherThread()
 {
     ros::Rate loop_rate(params_.fps);
@@ -819,6 +909,11 @@ void K4AROSDevice::framePublisherThread()
     calibration_data_.getDepthCameraInfo(rgb_rect_camera_info);
     calibration_data_.getRgbCameraInfo(depth_rect_camera_info);
     calibration_data_.getDepthCameraInfo(ir_raw_camera_info);
+
+    ros::Publisher pub_pcl_with_table = node_.advertise<sensor_msgs::PointCloud2>("pcl_lookup", 10);
+
+    k4a_float2_t xy_table[calibration_data_.getDepthWidth() * calibration_data_.getDepthHeight()];
+    create_xy_table(&calibration_data_.k4a_calibration_, xy_table);
 
     while (running_ && ros::ok() && !ros::isShuttingDown())
     {
@@ -1111,6 +1206,11 @@ void K4AROSDevice::framePublisherThread()
                     rgb_rect_camerainfo_publisher_.publish(rgb_rect_camera_info);
                 }
             }
+        }
+
+        if (pub_pcl_with_table.getNumSubscribers() > 0)
+        {
+            generate_point_cloud(capture.get_depth_image(), xy_table, calibration_data_, pub_pcl_with_table);
         }
 
         // Only create pointcloud when we are using a device or we have a synchronized image.
