@@ -743,6 +743,8 @@ k4a_result_t K4AROSDevice::getBodyMarker(const k4abt_body_t& body, MarkerPtr mar
     marker_msg->pose.orientation.z = orientation.v[2];
     marker_msg->pose.orientation.w = orientation.v[3];
 
+    marker_msg->text = std::to_string(body.skeleton.joints[jointType].confidence_level);
+
     return K4A_RESULT_SUCCEEDED;
 }
 
