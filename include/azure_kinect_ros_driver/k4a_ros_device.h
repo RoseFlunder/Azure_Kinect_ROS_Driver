@@ -7,6 +7,7 @@
 // System headers
 //
 #include <thread>
+#include <future>
 #include <atomic>
 #include <mutex>
 
@@ -54,6 +55,7 @@ class K4AROSDevice
 
     k4a_result_t getDepthFrame(const k4a::capture &capture, sensor_msgs::ImagePtr depth_frame, bool rectified);
 
+    void proccessPointCloud(const k4a::capture &capture, sensor_msgs::PointCloud2Ptr point_cloud);
     k4a_result_t getPointCloud(const k4a::capture &capture, sensor_msgs::PointCloud2Ptr point_cloud);
 
     k4a_result_t getRgbPointCloud(const k4a::capture &capture, sensor_msgs::PointCloud2Ptr point_cloud);
@@ -67,10 +69,9 @@ class K4AROSDevice
 
 #if defined(K4A_BODY_TRACKING)
     k4a_result_t getBodyMarker(const k4abt_body_t& body, visualization_msgs::MarkerPtr marker_msg, int jointType, ros::Time capture_time);
-
     k4a_result_t getBodyIndexMap(const k4abt::frame& body_frame, sensor_msgs::ImagePtr body_index_map_image);
-
     k4a_result_t renderBodyIndexMapToROS(sensor_msgs::ImagePtr body_index_map_image, k4a::image& k4a_body_index_map, const k4abt::frame& body_frame);
+    void proccessBodyTracking(const k4a::capture& capture);
 #endif
 
   private:
