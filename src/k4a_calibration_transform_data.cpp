@@ -86,7 +86,7 @@ void K4ACalibrationTransformData::initialize(const K4AROSDeviceParams params)
     // We publish all TFs all the time, even if the respective sensor data
     // output is off. This allows us to just use the SDK calibrations, and one
     // cosmetic TF output between the depth and the base.
-    publishDepthToBaseTf();
+    // publishDepthToBaseTf(); // remove this because it not needed
     publishImuToDepthTf();
     publishRgbToDepthTf();
 }
