@@ -970,7 +970,7 @@ void K4AROSDevice::framePublisherThread()
 
 #if defined(K4A_BODY_TRACKING)
         // Publish body markers when body tracking is enabled and a depth image is available
-        if (params_.body_tracking_enabled &&
+        if (params_.body_tracking_enabled && capture.get_depth_image() != nullptr &&
             (body_marker_publisher_.getNumSubscribers() > 0 || body_index_map_publisher_.getNumSubscribers() > 0))
         {
           capture_time = timestampToROS(capture.get_depth_image().get_device_timestamp());
